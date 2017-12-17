@@ -35,15 +35,8 @@ module Text.Megaparsec.Byte
   , hexDigitChar
   , asciiChar
     -- * More general parsers
-  , C.char
   , char'
-  , C.anyChar
-  , C.notChar
-  , C.oneOf
-  , C.noneOf
-  , C.satisfy
     -- * Sequence of bytes
-  , C.string
   , C.string' )
 where
 

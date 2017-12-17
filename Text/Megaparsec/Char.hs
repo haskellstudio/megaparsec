@@ -46,15 +46,8 @@ module Text.Megaparsec.Char
   , charCategory
   , categoryName
     -- * More general parsers
-  , char
   , char'
-  , anyChar
-  , notChar
-  , oneOf
-  , noneOf
-  , satisfy
     -- * Sequence of characters
-  , string
   , string' )
 where
 
@@ -291,17 +284,6 @@ categoryName = \case
 ----------------------------------------------------------------------------
 -- More general parsers
 
--- | @'char' c@ parses a single character @c@.
---
--- > semicolon = char ';'
-
-char :: MonadParsec e s m => Token s -> m (Token s)
-char c = token testChar expected
-  where
-    testChar x = if x == c then Just x else Nothing
-    expected   = E.singleton (Tokens (c:|[]))
-{-# INLINE char #-}
-
 -- | The same as 'char' but case-insensitive. This parser returns the
 -- actually parsed character preserving its case.
 --
@@ -321,88 +303,8 @@ char' c = choice [char c, char (swapCase c)]
       | otherwise = x
 {-# INLINE char' #-}
 
--- | This parser succeeds for any character. Returns the parsed character.
-
-anyChar :: MonadParsec e s m => m (Token s)
-anyChar = satisfy (const True) <?> "character"
-{-# INLINE anyChar #-}
-
--- | Match any character but the given one. It's a good idea to attach a
--- 'label' to this parser manually.
---
--- @since 6.0.0
-
-notChar :: MonadParsec e s m => Token s -> m (Token s)
-notChar c = satisfy (/= c)
-{-# INLINE notChar #-}
-
--- | @'oneOf' cs@ succeeds if the current character is in the supplied
--- collection of characters @cs@. Returns the parsed character. Note that
--- this parser cannot automatically generate the “expected” component of
--- error message, so usually you should label it manually with 'label' or
--- ('<?>').
---
--- See also: 'satisfy'.
---
--- > digit = oneOf ['0'..'9'] <?> "digit"
---
--- __Performance note__: prefer 'satisfy' when you can because it's faster
--- when you have only a couple of tokens to compare to:
---
--- > quoteFast = satisfy (\x -> x == '\'' || x == '\"')
--- > quoteSlow = oneOf "'\""
-
-oneOf :: (Foldable f, MonadParsec e s m)
-  => f (Token s)
-  -> m (Token s)
-oneOf cs = satisfy (`elem` cs)
-{-# INLINE oneOf #-}
-
--- | As the dual of 'oneOf', @'noneOf' cs@ succeeds if the current character
--- /not/ in the supplied list of characters @cs@. Returns the parsed
--- character. Note that this parser cannot automatically generate the
--- “expected” component of error message, so usually you should label it
--- manually with 'label' or ('<?>').
---
--- See also: 'satisfy'.
---
--- __Performance note__: prefer 'satisfy' and 'notChar' when you can because
--- it's faster.
-
-noneOf :: (Foldable f, MonadParsec e s m)
-  => f (Token s)
-  -> m (Token s)
-noneOf cs = satisfy (`notElem` cs)
-{-# INLINE noneOf #-}
-
--- | The parser @'satisfy' f@ succeeds for any character for which the
--- supplied function @f@ returns 'True'. Returns the character that is
--- actually parsed.
---
--- > digitChar = satisfy isDigit <?> "digit"
--- > oneOf cs  = satisfy (`elem` cs)
-
-satisfy :: MonadParsec e s m
-  => (Token s -> Bool) -- ^ Predicate to apply
-  -> m (Token s)
-satisfy f = token testChar E.empty
-  where
-    testChar x = if f x then Just x else Nothing
-{-# INLINE satisfy #-}
-
 ----------------------------------------------------------------------------
 -- Sequence of characters
-
--- | @'string' s@ parses a sequence of characters given by @s@. Returns the
--- parsed string (i.e. @s@).
---
--- > divOrMod = string "div" <|> string "mod"
-
-string :: MonadParsec e s m
-  => Tokens s
-  -> m (Tokens s)
-string = tokens (==)
-{-# INLINE string #-}
 
 -- | The same as 'string', but case-insensitive. On success returns string
 -- cased as actually parsed input.

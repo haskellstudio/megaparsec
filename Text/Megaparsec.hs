@@ -94,6 +94,13 @@ module Text.Megaparsec
     -- * Primitive combinators
   , MonadParsec (..)
     -- * Derivatives of primitive combinators
+  , single
+  , anySingle
+  , singleBut
+  , satisfy
+  , oneOf
+  , noneOf
+  , chunk
   , (<?>)
   , unexpected
   , customFailure
@@ -778,9 +785,12 @@ class (Stream s, A.Alternative m, MonadPlus m)
   -- This is the most primitive combinator for accepting tokens. For
   -- example, the 'Text.Megaparsec.Char.satisfy' parser is implemented as:
   --
-  -- > satisfy f = token testChar E.empty
+  -- > satisfy f = token testToken E.empty
   -- >   where
-  -- >     testChar x = if f x then Just x else Nothing
+  -- >     testToken x = if f x then Just x else Nothing
+  --
+  -- __Note__: type signature of this primitive has been changed in the
+  -- version /7.0.0/.
 
   token
     :: (Token s -> Maybe a)
@@ -1307,6 +1317,112 @@ fixs' _ (Right (b,s,w)) = (Right b, s, w)
 ----------------------------------------------------------------------------
 -- Derivatives of primitive combinators
 
+-- | @'single' t@ only matches the single token @t@.
+--
+-- See also: 'token'.
+--
+-- @since 7.0.0
+
+single :: MonadParsec e s m => Token s -> m (Token s)
+single t = token testToken expected
+  where
+    testToken x = if x == t then Just x else Nothing
+    expected    = E.singleton (Tokens (t:|[]))
+{-# INLINE single #-}
+
+-- | Parse and return a single token.
+--
+-- > anySingle = satisfy (const True)
+--
+-- See also: 'satisfy'.
+--
+-- @single 7.0.0.
+
+anySingle :: MonadParsec e s m => m (Token s)
+anySingle = satisfy (const True)
+{-# INLINE anySingle #-}
+
+-- | Match any token but the given one. It's a good idea to attach a 'label'
+-- to this parser manually.
+--
+-- > singleBut t = satisfy (/= t)
+--
+-- See also: 'single', 'anySingle', 'satisfy'.
+--
+-- @since 7.0.0
+
+singleBut :: MonadParsec e s m => Token s -> m (Token s)
+singleBut t = satisfy (/= t)
+{-# INLINE singleBut #-}
+
+-- | @'oneOf' ts@ succeeds if the current token is in the supplied
+-- collection of tokens @ts@. Returns the parsed token. Note that this
+-- parser cannot automatically generate the “expected” component of error
+-- message, so usually you should label it manually with 'label' or ('<?>').
+--
+-- > oneOf cs
+--
+-- See also: 'satisfy'.
+--
+-- > digit = oneOf ['0'..'9'] <?> "digit"
+--
+-- __Performance note__: prefer 'satisfy' when you can because it's faster
+-- when you have only a couple of tokens to compare to:
+--
+-- > quoteFast = satisfy (\x -> x == '\'' || x == '\"')
+-- > quoteSlow = oneOf "'\""
+--
+-- @since 7.0.0
+
+oneOf :: (Foldable f, MonadParsec e s m)
+  => f (Token s)
+  -> m (Token s)
+oneOf cs = satisfy (`elem` cs)
+{-# INLINE oneOf #-}
+
+-- | As the dual of 'oneOf', @'noneOf' ts@ succeeds if the current token
+-- /not/ in the supplied list of tokens @ts@. Returns the parsed character.
+-- Note that this parser cannot automatically generate the “expected”
+-- component of error message, so usually you should label it manually with
+-- 'label' or ('<?>').
+--
+-- See also: 'satisfy'.
+--
+-- __Performance note__: prefer 'satisfy' and 'singleBut' when you can
+-- because it's faster.
+
+noneOf :: (Foldable f, MonadParsec e s m)
+  => f (Token s)
+  -> m (Token s)
+noneOf cs = satisfy (`notElem` cs)
+{-# INLINE noneOf #-}
+
+-- | The parser @'satisfy' f@ succeeds for any token for which the supplied
+-- function @f@ returns 'True'. Returns the character that is actually
+-- parsed.
+--
+-- > digitChar = satisfy isDigit <?> "digit"
+-- > oneOf cs  = satisfy (`elem` cs)
+
+satisfy :: MonadParsec e s m
+  => (Token s -> Bool) -- ^ Predicate to apply
+  -> m (Token s)
+satisfy f = token testChar E.empty
+  where
+    testChar x = if f x then Just x else Nothing
+{-# INLINE satisfy #-}
+
+-- | @'string' s@ parses a sequence of characters given by @s@. Returns the
+-- parsed string (i.e. @s@).
+--
+-- > divOrMod = string "div" <|> string "mod"
+
+chunk :: MonadParsec e s m
+  => Tokens s
+  -> m (Tokens s)
+chunk = tokens (==)
+{-# INLINE chunk #-}
+
 -- | A synonym for 'label' in the form of an operator.
 
 infix 0 <?>
@@ -1615,4 +1731,4 @@ streamTake :: forall s. Stream s => Int -> s -> [Token s]
 streamTake n s =
   case fst <$> takeN_ n s of
     Nothing -> []
-    Just chunk -> chunkToTokens (Proxy :: Proxy s) chunk
+    Just chk -> chunkToTokens (Proxy :: Proxy s) chk
