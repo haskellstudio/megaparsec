@@ -45,9 +45,11 @@ module Text.Megaparsec.Char
   , latin1Char
   , charCategory
   , categoryName
-    -- * More general parsers
+    -- * Single character
+  , char
   , char'
     -- * Sequence of characters
+  , string
   , string' )
 where
 
@@ -55,11 +57,9 @@ import Control.Applicative
 import Data.Char
 import Data.Function (on)
 import Data.Functor (void)
-import Data.List.NonEmpty (NonEmpty (..))
 import Data.Proxy
 import Text.Megaparsec
 import qualified Data.CaseInsensitive as CI
-import qualified Data.Set             as E
 
 #if !MIN_VERSION_base(4,8,0)
 import Data.Foldable (Foldable (), elem, notElem)
@@ -282,7 +282,15 @@ categoryName = \case
   NotAssigned          -> "non-assigned Unicode character"
 
 ----------------------------------------------------------------------------
--- More general parsers
+-- Single character
+
+-- | A type-constrained version of 'single'.
+--
+-- > semicolon = char ';'
+
+char :: (MonadParsec e s m, Token s ~ Char) => Token s -> m (Token s)
+char = single
+{-# INLINE char #-}
 
 -- | The same as 'char' but case-insensitive. This parser returns the
 -- actually parsed character preserving its case.
@@ -305,6 +313,12 @@ char' c = choice [char c, char (swapCase c)]
 
 ----------------------------------------------------------------------------
 -- Sequence of characters
+
+-- | A type-constrained version of 'chunk'.
+
+string :: (MonadParsec e s m, Token s ~ Char) => Tokens s -> m (Tokens s)
+string = chunk
+{-# INLINE string #-}
 
 -- | The same as 'string', but case-insensitive. On success returns string
 -- cased as actually parsed input.
